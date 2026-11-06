@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otel Rezervasyon</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; font-size: 16px; background: #f4f1ec; color: #222; }
+  header { background: #2f4f4f; color: #fff; padding: 12px 18px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0 12px 0 0; font-size: 22px; font-weight: 600; }
+  button { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+  button:hover { background: #eee; }
+  button.primary { background: #2e7d32; color: #fff; border-color: #2e7d32; font-weight: 600; }
+  button.primary:hover { background: #256528; }
+  button.danger { background: #c62828; color: #fff; border-color: #c62828; }
+  header button { border-color: transparent; }
+  .month { font-size: 20px; font-weight: 600; min-width: 170px; text-align: center; }
+  .spacer { flex: 1; }
+  main { padding: 14px 18px; }
+  .today-box { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .card { background: #fff; border-radius: 10px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); flex: 1; min-width: 260px; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; color: #2f4f4f; }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { cursor: pointer; padding: 2px 0; }
+  .card li:hover { text-decoration: underline; }
+  .muted { color: #888; }
+  .grid-wrap { overflow-x: auto; background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  table.grid { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  .grid th, .grid td { border: 1px solid #e2ddd5; height: 46px; padding: 0; text-align: center; font-size: 13px; }
+  .grid th.room, .grid td.room { width: 150px; position: sticky; left: 0; background: #faf8f4; z-index: 2; text-align: left; padding: 0 10px; font-weight: 600; font-size: 15px; }
+  .grid thead th { background: #faf8f4; font-weight: 500; }
+  .grid thead th .dn { display: block; font-size: 11px; color: #888; }
+  .grid th.we, .grid td.we { background: #f3efe8; }
+  .grid th.today { background: #ffe9a8; }
+  .grid td.empty { cursor: pointer; }
+  .grid td.empty:hover { background: #dff0df; }
+  .grid td.empty:hover::after { content: "+"; color: #2e7d32; font-size: 20px; }
+  .bk { cursor: pointer; padding: 0 4px; }
+  .bk div { border-radius: 6px; height: 38px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 6px; }
+  .paid { background: #2e7d32; }
+  .deposit { background: #ef8a17; }
+  .unpaid { background: #c62828; }
+  .legend { margin: 10px 2px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 6px; vertical-align: -2px; background: var(--c); }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: flex-start; justify-content: center; padding-top: 40px; z-index: 10; overflow-y: auto; }
+  .overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 12px; padding: 20px 24px; width: 520px; max-width: 95vw; margin-bottom: 40px; }
+  .modal h2 { margin: 0 0 14px; font-size: 20px; }
+  .row { display: flex; gap: 12px; }
+  .row > label { flex: 1; }
+  label { display: block; margin-bottom: 10px; font-size: 14px; color: #555; }
+  input, select, textarea { display: block; width: 100%; font: inherit; padding: 8px 10px; border: 1px solid #bbb; border-radius: 7px; margin-top: 3px; color: #222; }
+  textarea { height: 60px; resize: vertical; }
+  .info { font-size: 14px; color: #2f4f4f; margin: 2px 0 10px; }
+  .err { color: #c62828; font-weight: 600; margin: 6px 0; min-height: 1em; }
+  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+  .actions .left { margin-right: auto; }
+  .room-line { display: flex; gap: 8px; margin-bottom: 8px; }
+  .room-line input { margin: 0; }
+  .search-res li { margin-bottom: 4px; }
+  .backup-warn { background: #fff3cd; border: 1px solid #f0d27a; padding: 8px 14px; border-radius: 8px; margin-bottom: 12px; display: none; }
+  @media print { header, .today-box, .legend, .backup-warn { display: none; } .grid td.empty:hover::after { content: ""; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏨 Rezervasyonlar</h1>
+  <button onclick="changeMonth(-1)">◀</button>
+  <span class="month" id="monthLabel"></span>
+  <button onclick="changeMonth(1)">▶</button>
+  <button onclick="goToday()">Bugün</button>
+  <span class="spacer"></span>
+  <button class="primary" onclick="openBooking()">+ Yeni Rezervasyon</button>
+  <button onclick="openSearch()">🔍 Ara</button>
+  <button onclick="openRooms()">Odalar</button>
+  <button onclick="window.openFolder()">📁 Kayıt Klasörü</button>
+  <button onclick="document.getElementById('restoreFile').click()">Yedekten Yükle</button>
+  <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreBackup(this)">
+</header>
+
+<main>
+  <div class="backup-warn" id="backupWarn"></div>
+  <div class="today-box">
+    <div class="card"><h3>Bugün gelecekler</h3><ul id="arrivals"></ul></div>
+    <div class="card"><h3>Bugün çıkacaklar</h3><ul id="departures"></ul></div>
+    <div class="card"><h3>Şu an otelde</h3><ul id="inhouse"></ul></div>
+  </div>
+  <div class="grid-wrap"><table class="grid" id="grid"></table></div>
+  <div class="legend">
+    <span style="--c:#2e7d32">Ödendi</span>
+    <span style="--c:#ef8a17">Kapora alındı</span>
+    <span style="--c:#c62828">Ödeme yok</span>
+    <span class="muted" style="--c:transparent">Boş kutuya tıklayın → yeni rezervasyon. Renkli kutuya tıklayın → düzenle.</span>
+  </div>
+</main>
+
+<!-- Rezervasyon formu -->
+<div class="overlay" id="bookingOverlay">
+  <div class="modal">
+    <h2 id="bookingTitle">Yeni Rezervasyon</h2>
+    <label>Misafir adı soyadı<input id="fName"></label>
+    <div class="row">
+      <label>Telefon<input id="fPhone"></label>
+      <label>Kişi sayısı<input id="fPeople" type="number" min="1" value="2"></label>
+    </div>
+    <label>Oda<select id="fRoom"></select></label>
+    <div class="row">
+      <label>Giriş tarihi<input id="fIn" type="date" oninput="updateInfo()"></label>
+      <label>Çıkış tarihi<input id="fOut" type="date" oninput="updateInfo()"></label>
+    </div>
+    <div class="info" id="fInfo"></div>
+    <div class="row">
+      <label>Toplam ücret<input id="fPrice" type="number" min="0" oninput="updateInfo()"></label>
+      <label>Alınan ödeme<input id="fPaid" type="number" min="0" oninput="updateInfo()"></label>
+      <label>Para birimi<select id="fCur"><option>TL</option><option>€</option><option>£</option><option>$</option></select></label>
+    </div>
+    <label>Not<textarea id="fNote" placeholder="Örn: Booking.com'dan, geç gelecek, kahvaltı dahil..."></textarea></label>
+    <div class="err" id="fErr"></div>
+    <div class="actions">
+      <button class="danger left" id="btnDelete" onclick="deleteBooking()">Sil</button>
+      <button onclick="closeAll()">Vazgeç</button>
+      <button class="primary" onclick="saveBooking()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Odalar -->
+<div class="overlay" id="roomsOverlay">
+  <div class="modal">
+    <h2>Odalar</h2>
+    <p class="muted" style="margin-top:0">Oda isimlerini buradan değiştirebilirsiniz.</p>
+    <div id="roomList"></div>
+    <button onclick="addRoomLine()">+ Oda ekle</button>
+    <div class="err" id="rErr"></div>
+    <div class="actions">
+      <button onclick="closeAll()">Vazgeç</button>
+      <button class="primary" onclick="saveRooms()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Arama -->
+<div class="overlay" id="searchOverlay">
+  <div class="modal">
+    <h2>Rezervasyon Ara</h2>
+    <label>İsim, telefon veya not<input id="sQuery" oninput="runSearch()"></label>
+    <ul class="search-res" id="sResults"></ul>
+    <div class="actions"><button onclick="closeAll()">Kapat</button></div>
+  </div>
+</div>
+
+<script>
+const KEY = "otelRezervasyon_v1";
+const MONTHS = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+const DAYS = ["Paz","Pzt","Sal","Çar","Per","Cum","Cmt"];
+
+let data = { rooms: [], bookings: [] };
+let view = new Date(); view.setDate(1);
+let editingId = null;
+let saveFailed = false;
+
+// ---------- kayıt (Belgeler\Otel Rezervasyon\veriler.json) ----------
+async function load() {
+  try {
+    const raw = await window.loadData();
+    if (raw) {
+      const d = JSON.parse(raw);
+      data = { rooms: d.rooms || [], bookings: d.bookings || [] };
+    }
+  } catch (e) {
+    alert("Kayıt dosyası okunamadı!\n\nProgramı kapatın ve 'Kayıt Klasörü' içindeki 'yedekler' klasöründen son yedeği yükleyin.\n\n" + e);
+    data.readError = true;
+  }
+  if (!data.rooms.length && !data.readError) {
+    data.rooms = ["Oda 1","Oda 2","Oda 3","Oda 4","Oda 5"].map(n => ({ id: uid(), name: n }));
+    persist();
+  }
+}
+function persist() {
+  if (data.readError) return; // bozuk dosyanın üstüne boş veri yazma
+  const out = JSON.stringify({ rooms: data.rooms, bookings: data.bookings, saved: new Date().toISOString() }, null, 2);
+  window.saveData(out)
+    .then(() => { saveFailed = false; showWarn(); })
+    .catch(e => { saveFailed = true; showWarn(); alert("KAYDEDİLEMEDİ!\n\n" + e); });
+}
+function showWarn() {
+  const w = document.getElementById("backupWarn");
+  w.textContent = saveFailed ? "⚠️ Son değişiklik kaydedilemedi. Programı kapatıp tekrar açın." : "";
+  w.style.display = saveFailed ? "block" : "none";
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+// ---------- tarih yardımcıları ----------
+function iso(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+function parse(s) { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
+function addDays(s, n) { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); }
+function nights(a, b) { return Math.round((parse(b) - parse(a)) / 86400000); }
+function nice(s) { const d = parse(s); return d.getDate() + " " + MONTHS[d.getMonth()] + " " + DAYS[d.getDay()]; }
+const todayIso = () => iso(new Date());
+
+// ---------- yardımcılar ----------
+function roomName(id) { const r = data.rooms.find(r => r.id === id); return r ? r.name : "(silinmiş oda)"; }
+function status(b) {
+  const p = +b.price || 0, paid = +b.paid || 0;
+  if (p > 0 && paid >= p) return "paid";
+  if (paid > 0) return "deposit";
+  return "unpaid";
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function bookingAt(roomId, day) { return data.bookings.find(b => b.room === roomId && b.in <= day && day < b.out); }
+
+// ---------- çizim ----------
+function render() {
+  document.getElementById("monthLabel").textContent = MONTHS[view.getMonth()] + " " + view.getFullYear();
+  const y = view.getFullYear(), m = view.getMonth();
+  const n = new Date(y, m + 1, 0).getDate();
+  const first = iso(new Date(y, m, 1)), afterLast = iso(new Date(y, m + 1, 1));
+  const today = todayIso();
+
+  let h = '<colgroup><col style="width:150px">' + '<col>'.repeat(n) + '</colgroup><thead><tr><th class="room">Oda</th>';
+  for (let d = 1; d <= n; d++) {
+    const dt = new Date(y, m, d), s = iso(dt), we = dt.getDay() === 0 || dt.getDay() === 6;
+    h += `<th class="${we ? "we" : ""} ${s === today ? "today" : ""}">${d}<span class="dn">${DAYS[dt.getDay()]}</span></th>`;
+  }
+  h += "</tr></thead><tbody>";
+
+  for (const r of data.rooms) {
+    h += `<tr><td class="room">${esc(r.name)}</td>`;
+    let d = 1;
+    while (d <= n) {
+      const dt = new Date(y, m, d), s = iso(dt);
+      const b = bookingAt(r.id, s);
+      if (b) {
+        const end = b.out < afterLast ? b.out : afterLast;
+        const span = nights(s, end);
+        const title = `${b.name} | ${nice(b.in)} → ${nice(b.out)} | ${b.phone || ""}`;
+        h += `<td class="bk" colspan="${span}" title="${esc(title)}" onclick="openBooking('${b.id}')"><div class="${status(b)}">${esc(b.name)}</div></td>`;
+        d += span;
+      } else {
+        const we = dt.getDay() === 0 || dt.getDay() === 6;
+        h += `<td class="empty ${we ? "we" : ""}" onclick="openBooking(null,'${r.id}','${s}')"></td>`;
+        d++;
+      }
+    }
+    h += "</tr>";
+  }
+  h += "</tbody>";
+  document.getElementById("grid").innerHTML = h;
+
+  const li = b => `<li onclick="openBooking('${b.id}')">${esc(roomName(b.room))} — ${esc(b.name)} ${b.phone ? "(" + esc(b.phone) + ")" : ""}</li>`;
+  const none = '<li class="muted" style="list-style:none;margin-left:-18px">Yok</li>';
+  const arr = data.bookings.filter(b => b.in === today);
+  const dep = data.bookings.filter(b => b.out === today);
+  const inh = data.bookings.filter(b => b.in <= today && today < b.out);
+  document.getElementById("arrivals").innerHTML = arr.map(li).join("") || none;
+  document.getElementById("departures").innerHTML = dep.map(li).join("") || none;
+  document.getElementById("inhouse").innerHTML = inh.map(li).join("") || none;
+}
+
+function changeMonth(k) { view.setMonth(view.getMonth() + k); render(); }
+function goToday() { view = new Date(); view.setDate(1); render(); }
+
+// ---------- rezervasyon formu ----------
+function $(id) { return document.getElementById(id); }
+function openBooking(id, roomId, day) {
+  editingId = id || null;
+  $("fRoom").innerHTML = data.rooms.map(r => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+  $("fErr").textContent = "";
+  if (id) {
+    const b = data.bookings.find(x => x.id === id);
+    $("bookingTitle").textContent = "Rezervasyonu Düzenle";
+    $("fName").value = b.name; $("fPhone").value = b.phone || ""; $("fPeople").value = b.people || "";
+    $("fRoom").value = b.room; $("fIn").value = b.in; $("fOut").value = b.out;
+    $("fPrice").value = b.price || ""; $("fPaid").value = b.paid || ""; $("fCur").value = b.cur || "TL";
+    $("fNote").value = b.note || "";
+    $("btnDelete").style.display = "";
+  } else {
+    const start = day || todayIso();
+    $("bookingTitle").textContent = "Yeni Rezervasyon";
+    ["fName","fPhone","fPrice","fPaid","fNote"].forEach(f => $(f).value = "");
+    $("fPeople").value = 2;
+    if (roomId) $("fRoom").value = roomId;
+    $("fIn").value = start; $("fOut").value = addDays(start, 1);
+    $("btnDelete").style.display = "none";
+  }
+  updateInfo();
+  $("bookingOverlay").classList.add("open");
+  setTimeout(() => $("fName").focus(), 50);
+}
+
+function updateInfo() {
+  const a = $("fIn").value, b = $("fOut").value;
+  let t = "";
+  if (a && b && b > a) t = `${nights(a, b)} gece`;
+  const price = +$("fPrice").value || 0, paid = +$("fPaid").value || 0;
+  if (price) t += ` · Kalan ödeme: ${Math.max(price - paid, 0)} ${$("fCur").value}`;
+  $("fInfo").textContent = t;
+}
+
+function saveBooking() {
+  const b = {
+    id: editingId || uid(),
+    name: $("fName").value.trim(), phone: $("fPhone").value.trim(), people: $("fPeople").value,
+    room: $("fRoom").value, in: $("fIn").value, out: $("fOut").value,
+    price: $("fPrice").value, paid: $("fPaid").value, cur: $("fCur").value, note: $("fNote").value.trim()
+  };
+  if (!b.name) return $("fErr").textContent = "Misafir adını yazın.";
+  if (!b.in || !b.out) return $("fErr").textContent = "Giriş ve çıkış tarihini seçin.";
+  if (b.out <= b.in) return $("fErr").textContent = "Çıkış tarihi giriş tarihinden sonra olmalı.";
+  const clash = data.bookings.find(x => x.id !== b.id && x.room === b.room && x.in < b.out && b.in < x.out);
+  if (clash) return $("fErr").textContent = `Bu oda o tarihlerde dolu: ${clash.name} (${nice(clash.in)} → ${nice(clash.out)})`;
+
+  const i = data.bookings.findIndex(x => x.id === b.id);
+  if (i >= 0) data.bookings[i] = b; else data.bookings.push(b);
+  persist(); closeAll();
+  view = parse(b.in); view.setDate(1);
+  render();
+}
+
+function deleteBooking() {
+  const b = data.bookings.find(x => x.id === editingId);
+  if (!b || !confirm(`${b.name} rezervasyonu silinsin mi?`)) return;
+  data.bookings = data.bookings.filter(x => x.id !== editingId);
+  persist(); closeAll(); render();
+}
+
+// ---------- odalar ----------
+function openRooms() {
+  $("roomList").innerHTML = "";
+  data.rooms.forEach(r => addRoomLine(r));
+  $("rErr").textContent = "";
+  $("roomsOverlay").classList.add("open");
+}
+function addRoomLine(r) {
+  const div = document.createElement("div");
+  div.className = "room-line";
+  div.dataset.id = r && r.id ? r.id : uid();
+  div.innerHTML = `<input value="${esc(r && r.name ? r.name : "")}" placeholder="Oda adı"><button onclick="this.parentNode.remove()">Kaldır</button>`;
+  $("roomList").appendChild(div);
+}
+function saveRooms() {
+  const lines = [...document.querySelectorAll("#roomList .room-line")];
+  const rooms = lines.map(l => ({ id: l.dataset.id, name: l.querySelector("input").value.trim() })).filter(r => r.name);
+  if (!rooms.length) return $("rErr").textContent = "En az bir oda olmalı.";
+  const removed = data.rooms.filter(r => !rooms.find(x => x.id === r.id));
+  const busy = removed.filter(r => data.bookings.some(b => b.room === r.id && b.out >= todayIso()));
+  if (busy.length) return $("rErr").textContent = `Şu odanın ileri tarihli rezervasyonu var, önce onları taşıyın: ${busy.map(r => r.name).join(", ")}`;
+  data.rooms = rooms; persist(); closeAll(); render();
+}
+
+// ---------- arama ----------
+function openSearch() { $("sQuery").value = ""; $("sResults").innerHTML = ""; $("searchOverlay").classList.add("open"); setTimeout(() => $("sQuery").focus(), 50); }
+function runSearch() {
+  const q = $("sQuery").value.trim().toLocaleLowerCase("tr");
+  if (!q) return $("sResults").innerHTML = "";
+  const res = data.bookings
+    .filter(b => [b.name, b.phone, b.note].join(" ").toLocaleLowerCase("tr").includes(q))
+    .sort((a, b) => b.in.localeCompare(a.in));
+  $("sResults").innerHTML = res.map(b =>
+    `<li><a href="#" onclick="closeAll();openBooking('${b.id}');return false">${esc(b.name)}</a> — ${esc(roomName(b.room))}, ${nice(b.in)} → ${nice(b.out)}</li>`
+  ).join("") || '<li class="muted">Bulunamadı</li>';
+}
+
+function closeAll() { document.querySelectorAll(".overlay").forEach(o => o.classList.remove("open")); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
+document.querySelectorAll(".overlay").forEach(o => o.addEventListener("mousedown", e => { if (e.target === o) closeAll(); }));
+
+// ---------- yedek ----------
+function restoreBackup(input) {
+  const f = input.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const d = JSON.parse(rd.result);
+      if (!Array.isArray(d.rooms) || !Array.isArray(d.bookings)) throw 0;
+      if (!confirm(`Yedek yüklensin mi? (${d.bookings.length} rezervasyon) Şu anki veriler bunun yerine geçecek.`)) return;
+      data = { rooms: d.rooms, bookings: d.bookings };
+      persist(); render();
+    } catch (e) { alert("Bu dosya geçerli bir yedek değil."); }
+    input.value = "";
+  };
+  rd.readAsText(f);
+}
+
+load().then(render);
+</script>
+</body>
+</html>
